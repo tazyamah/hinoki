@@ -1,0 +1,9 @@
+# コメントテーブルの作成
+migration "create_comments" do
+  create_table :comments do
+    references  :articles
+    string      :author, null: false, limit: 200
+    text        :body
+    index       :article_id
+  end
+end

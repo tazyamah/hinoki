@@ -1,0 +1,12 @@
+# 記事テーブルの作成
+migration "create_articles" do
+  create_table :articles do
+    string    :title, null: false, limit: 500
+    text      :body
+    string    :author, limit: 200
+    boolean   :published, default: false
+    integer   :view_count, default: 0
+    index     :published
+    index     [:author, :published]
+  end
+end

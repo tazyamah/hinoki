@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hinoki"
+version = "0.1.0"
+description = "🌲 Full-Stack Web Framework for OCI Autonomous Database"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [{name = "Hinoki Contributors"}]
+keywords = ["oracle", "autonomous-database", "oci", "web-framework", "plsql", "ords"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: PL/SQL",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Database",
+]
+dependencies = [
+    "oracledb>=2.0.0",
+    "click>=8.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+hinoki = "hinoki.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/hinoki-framework/hinoki"
+Repository = "https://github.com/hinoki-framework/hinoki"
+
+[tool.setuptools.packages.find]
+include = ["hinoki*"]
+
+[tool.setuptools.package-data]
+"hinoki.core" = ["*.sql"]
+"hinoki.templates" = ["*"]

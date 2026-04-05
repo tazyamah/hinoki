@@ -1,0 +1,16 @@
+# 🌲 Blog ルーティング
+routes "blog" do
+  root "articles#index"
+
+  resources :articles do
+    resources :comments, only: [:create, :destroy]
+  end
+
+  get  "/about"   => "pages#about"
+  post "/contact" => "pages#contact"
+
+  # API名前空間 (JSON応答)
+  namespace :api do
+    resources :articles, only: [:index, :show]
+  end
+end

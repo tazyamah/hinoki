@@ -1,0 +1,32 @@
+# 記事モデル
+model Article
+  table :articles
+
+  permit :title, :body, :author, :published
+
+  validates :title, presence: true, length: { max: 500 }
+  validates :body,  presence: true
+
+  has_many :comments, foreign_key: :article_id
+
+  scope :published, -> { where "published = 1".order "created_at DESC" }
+  scope :recent,    -> { order "created_at DESC".limit 10 }
+  scope :by_author, -> { order "author ASC" }
+
+  before_save :set_defaults
+
+  # 閲覧数をインクリメント
+  def increment_views(p_id)
+    raw_plsql <<~SQL
+      BEGIN
+          hinoki_model.update_record('articles', p_id,
+              'view_count = view_count + 1');
+      END;
+    SQL
+  end
+
+  # デフォルト値設定
+  def set_defaults
+    self.view_count = 0
+  end
+end

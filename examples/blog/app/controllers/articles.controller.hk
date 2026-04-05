@@ -1,0 +1,45 @@
+# 記事コントローラ
+controller Articles
+  # before_action :require_login, except: [:index, :show]
+
+  def index
+    @posts = Article.published.paginate(params[:page])
+    @pagination = Article.pagination_info(params[:page])
+    render "articles/index"
+  end
+
+  def show
+    @article = Article.find(params[:id])
+    render "articles/show"
+  end
+
+  def new_form
+    @page_title = "新しい記事"
+    render "articles/new"
+  end
+
+  def create_action
+    @article = Article.new(permit(:title, :body, :author))
+    if @article.save
+      redirect_to "/articles/#{@article.id}", flash: "記事を作成しました！"
+    else
+      render "articles/new"
+    end
+  end
+
+  def edit_form
+    @article = Article.find(params[:id])
+    render "articles/edit"
+  end
+
+  def update_action
+    @article = Article.find(params[:id])
+    @article.update(permit(:title, :body, :author, :published))
+    redirect_to "/articles/#{@article.id}", flash: "記事を更新しました"
+  end
+
+  def delete_action
+    Article.delete(params[:id])
+    redirect_to "/articles", flash: "記事を削除しました"
+  end
+end

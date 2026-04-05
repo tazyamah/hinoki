@@ -1,0 +1,18 @@
+<h2>{{ title }}</h2>
+<div class="hinoki-card">
+    <p><strong>著者:</strong> {{ author }}</p>
+    <p><strong>閲覧数:</strong> {{ view_count }}</p>
+    <p><strong>作成日:</strong> {{ created_at }}</p>
+    {% if published %}
+        <span style="color:green">● 公開中</span>
+    {% else %}
+        <span style="color:gray">● 下書き</span>
+    {% endif %}
+    <hr>
+    <div>{{{ body }}}</div>
+    <div class="hinoki-actions" style="margin-top:20px">
+        <a href="/articles/{{ id }}/edit" class="hinoki-btn">編集</a>
+        <a href="/articles/{{ id }}/delete" class="hinoki-danger"
+           onclick="return confirm('削除しますか？')">削除</a>
+    </div>
+</div>

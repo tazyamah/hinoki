@@ -1,0 +1,6 @@
+app:
+  name: blog
+  version: 0.1.0
+ords:
+  base_path: /blog/
+  module_name: blog

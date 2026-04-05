@@ -1,0 +1,6 @@
+environment: development
+development:
+  username: ADMIN
+  password: YOUR_PASSWORD_HERE
+  dsn: your_adb_high
+  wallet_location: /path/to/Wallet

@@ -1,0 +1,26 @@
+<h2>🌲 記事一覧</h2>
+{{{ nav }}}
+
+{% for post in posts %}
+<article class="hinoki-card" style="margin-bottom:16px">
+  <h3><a href="/articles/{{ post.id }}" style="color:#2d5016;text-decoration:none">{{ post.title }}</a></h3>
+  <p style="color:#666;font-size:0.9em">
+    {{ post.author | default "匿名" }} · {{ post.created_at | time_ago }}
+    · 閲覧数: {{ post.view_count | number_format }}
+  </p>
+  {% if post.published %}
+    <span style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:4px;font-size:0.8em">公開中</span>
+  {% else %}
+    <span style="background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:4px;font-size:0.8em">下書き</span>
+  {% endif %}
+  <p style="margin-top:8px">{{ post.body | truncate 200 }}</p>
+  <div class="hinoki-actions">
+    <a href="/articles/{{ post.id }}">詳細</a>
+    <a href="/articles/{{ post.id }}/edit">編集</a>
+    <a href="/articles/{{ post.id }}/delete" class="hinoki-danger"
+       onclick="return confirm('削除しますか？')">削除</a>
+  </div>
+</article>
+{% endfor %}
+
+{{{ pagination }}}
