@@ -31,19 +31,50 @@ pip install -e .
 
 ### 1. 接続情報を設定する
 
-`config/database.yml` を編集して ADB の接続情報を入力します。
+`hinoki db:init` コマンドを使うと、対話形式で `config/database.yml` を生成できます。
 
-```yaml
-environment: development
-development:
-  username: ADMIN          # DBユーザー名
-  password: YOUR_PASSWORD  # パスワード
-  dsn: your_adb_high       # ウォレット内の接続サービス名
-  wallet_location: /path/to/Wallet  # ウォレットフォルダのパス
+```bash
+cd examples/blog
+hinoki db:init
 ```
 
-> **ヒント**: ウォレット（`Wallet_xxx.zip`）は OCI コンソールの ADB 詳細画面からダウンロードできます。  
-> `database.yml` にはパスワードが含まれるため、`.gitignore` に追加してバージョン管理に含めないよう注意してください。
+実行すると以下のように接続情報を順番に入力できます:
+
+```
+🌲 database.yml の設定を行います。
+
+  接続サービス名 (DSN / OCID 末尾の接続名, 例: myadb_high): myadb_high
+  DBユーザー名 [ADMIN]: ADMIN
+  DBパスワード: ********
+  DBパスワード (確認): ********
+  ウォレットフォルダのパス (例: /path/to/Wallet_xxx): /home/user/Wallet_myadb
+
+✓ config/database.yml を生成しました。
+✓ .gitignore に config/database.yml を追加しました。
+```
+
+引数で直接指定することも可能です（CI/CD 環境など）:
+
+```bash
+hinoki db:init \
+  --dsn myadb_high \
+  --username ADMIN \
+  --password "YourPassword!" \
+  --wallet /path/to/Wallet_myadb
+```
+
+> **ヒント — ウォレットを CLI で自動取得する場合**:
+>
+> ```bash
+> pip install "hinoki[oci]"   # または pip install oci
+> hinoki db:download-wallet --dest ./wallet --update-config
+> ```
+>
+> ADB の OCID・ウォレットパスワード・保存先を対話形式で入力すると、ダウンロード〜展開〜`database.yml` への反映まで自動で完了します。  
+> `~/.oci/config` に OCI 認証情報が設定されていることが前提です。
+>
+> **手動でダウンロードする場合**: OCI コンソールの ADB 詳細画面 →「データベース接続」→「ウォレットのダウンロード」から ZIP を取得し、任意のフォルダに展開してください。  
+> `database.yml` にはパスワードが含まれるため、`.gitignore` への自動追加を確認し、バージョン管理に含めないよう注意してください。
 
 ### 2. フレームワーク本体を ADB にインストールする
 

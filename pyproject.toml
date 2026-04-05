@@ -26,6 +26,11 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.optional-dependencies]
+oci = [
+    "oci>=2.100.0",
+]
+
 [project.scripts]
 hinoki = "hinoki.cli:main"
 

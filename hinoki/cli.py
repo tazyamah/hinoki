@@ -98,6 +98,17 @@ def execute_sql_file(cursor, filepath):
             click.echo(f"    Warning: {e}")
 
 
+def _require_oci():
+    try:
+        import oci as _oci
+        return _oci
+    except ImportError:
+        raise click.ClickException(
+            "The 'oci' package is required for this command.\n"
+            "Install it with:  pip install \"hinoki[oci]\"  or  pip install oci"
+        )
+
+
 def pluralize(name):
     if name.endswith("y") and name[-2] not in "aeiou":
         return name[:-1] + "ies"
@@ -195,6 +206,179 @@ def new(app_name):
   hinoki migrate
   hinoki deploy
 """)
+
+
+# ---------- db:init ----------
+
+@cli.command("db:init")
+@click.option("--dsn",      default=None, help="接続サービス名 (例: myadb_high)")
+@click.option("--username", default=None, help="DBユーザー名 (例: ADMIN)")
+@click.option("--password", default=None, help="DBパスワード")
+@click.option("--wallet",   default=None, help="ウォレットフォルダのパス")
+@click.option("--force",    is_flag=True,  help="既存の database.yml を上書き")
+def db_init(dsn, username, password, wallet, force):
+    """config/database.yml を対話形式または引数で生成する"""
+    root = get_project_root()
+    db_file = root / "config" / "database.yml"
+
+    if db_file.exists() and not force:
+        click.echo(f"config/database.yml はすでに存在します。上書きするには --force を指定してください。")
+        sys.exit(1)
+
+    click.echo("🌲 database.yml の設定を行います。\n")
+
+    if dsn is None:
+        dsn = click.prompt("  接続サービス名 (DSN / OCID 末尾の接続名, 例: myadb_high)")
+    if username is None:
+        username = click.prompt("  DBユーザー名", default="ADMIN")
+    if password is None:
+        password = click.prompt("  DBパスワード", hide_input=True, confirmation_prompt=True)
+    if wallet is None:
+        wallet = click.prompt("  ウォレットフォルダのパス (例: /path/to/Wallet_xxx)")
+
+    (root / "config").mkdir(parents=True, exist_ok=True)
+    db_file.write_text(textwrap.dedent(f"""\
+        environment: development
+        development:
+          username: {username}
+          password: {password}
+          dsn: {dsn}
+          wallet_location: {wallet}
+        production:
+          username: {username}
+          password: {password}
+          dsn: {dsn}
+          wallet_location: {wallet}
+    """))
+
+    click.echo(f"\n✓ config/database.yml を生成しました。")
+
+    # .gitignore に追記
+    gitignore = root / ".gitignore"
+    entry = "config/database.yml"
+    if gitignore.exists():
+        content = gitignore.read_text()
+        if entry not in content:
+            gitignore.write_text(content.rstrip() + f"\n{entry}\n")
+            click.echo(f"✓ .gitignore に {entry} を追加しました。")
+    else:
+        gitignore.write_text(f"{entry}\n")
+        click.echo(f"✓ .gitignore を作成し {entry} を追加しました。")
+
+    click.echo("""
+⚠️  database.yml にはパスワードが含まれます。
+   .gitignore に追加済みですが、コミットしないよう注意してください。
+""")
+
+
+# ---------- db:download-wallet ----------
+
+@cli.command("db:download-wallet")
+@click.option("--ocid",            default=None, help="Autonomous Database の OCID")
+@click.option("--wallet-password", default=None, help="ウォレット ZIP のパスワード", hide_input=True)
+@click.option("--dest",            default=None, help="展開先ディレクトリ (default: ./wallet)")
+@click.option("--profile",         default="DEFAULT", show_default=True, help="OCI config のプロファイル名")
+@click.option("--update-config",   is_flag=True, help="database.yml の wallet_location を自動更新")
+def db_download_wallet(ocid, wallet_password, dest, profile, update_config):
+    """OCI SDK でウォレットをダウンロードしてローカルに展開する"""
+    oci = _require_oci()
+
+    if ocid is None:
+        ocid = click.prompt(
+            "  Autonomous Database OCID "
+            "(例: ocid1.autonomousdatabase.oc1.ap-tokyo-1.xxx)"
+        )
+    if wallet_password is None:
+        wallet_password = click.prompt(
+            "  Wallet password",
+            hide_input=True,
+            confirmation_prompt=True
+        )
+    if dest is None:
+        dest = click.prompt("  展開先ディレクトリ", default="./wallet")
+
+    dest_path = Path(dest).expanduser().resolve()
+
+    click.echo(f"\n🌲 OCI config を読み込んでいます (profile: {profile})...")
+    try:
+        oci_config = oci.config.from_file(profile_name=profile)
+        oci.config.validate_config(oci_config)
+    except oci.exceptions.ConfigFileNotFound:
+        raise click.ClickException(
+            "OCI config ファイルが見つかりません。\n"
+            "~/.oci/config を設定してください:\n"
+            "https://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdkconfig.htm"
+        )
+    except oci.exceptions.InvalidConfig as e:
+        raise click.ClickException(f"OCI config が不正です: {e}")
+
+    click.echo("  DatabaseClient.generate_autonomous_database_wallet() を呼び出しています...")
+    try:
+        db_client = oci.database.DatabaseClient(oci_config)
+        wallet_details = oci.database.models.GenerateAutonomousDatabaseWalletDetails(
+            password=wallet_password,
+            generate_type="SINGLE"
+        )
+        response = db_client.generate_autonomous_database_wallet(
+            autonomous_database_id=ocid,
+            generate_autonomous_database_wallet_details=wallet_details,
+        )
+    except oci.exceptions.ServiceError as e:
+        raise click.ClickException(
+            f"OCI API エラー (HTTP {e.status}): {e.message}\n"
+            f"  Request ID: {e.request_id}"
+        )
+
+    import io
+    import zipfile
+
+    click.echo(f"  ウォレットを展開しています: {dest_path}")
+    dest_path.mkdir(parents=True, exist_ok=True)
+
+    with zipfile.ZipFile(io.BytesIO(response.data.content)) as zf:
+        zf.extractall(dest_path)
+        extracted = [f.filename for f in zf.infolist()]
+
+    click.echo(f"  展開されたファイル ({len(extracted)} 件):")
+    for name in extracted:
+        click.echo(f"    {name}")
+
+    click.echo(f"\n✓ ウォレットを保存しました: {dest_path}")
+
+    if update_config:
+        root = get_project_root()
+        db_file = root / "config" / "database.yml"
+        if db_file.exists():
+            with open(db_file) as f:
+                db_cfg = yaml.safe_load(f) or {}
+            env = db_cfg.get("environment", "development")
+            for section in set([env, "production", "development"]):
+                if section in db_cfg and isinstance(db_cfg[section], dict):
+                    db_cfg[section]["wallet_location"] = str(dest_path)
+            with open(db_file, "w") as f:
+                yaml.dump(db_cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            click.echo(f"✓ config/database.yml を更新しました: wallet_location = {dest_path}")
+        else:
+            click.echo(
+                f"  config/database.yml が見つかりません。\n"
+                f"  次のコマンドで生成してください:\n"
+                f"    hinoki db:init --wallet {dest_path}"
+            )
+
+    click.echo("")
+    if not update_config:
+        click.echo(
+            f"次のステップ:\n"
+            f"  1. hinoki db:init --wallet {dest_path}\n"
+            f"  2. hinoki install\n"
+            f"  3. hinoki deploy"
+        )
+    else:
+        click.echo(
+            "次のステップ:\n"
+            "  1. hinoki install\n"
+            "  2. hinoki deploy"
+        )
 
 
 # ---------- compile ----------

@@ -51,8 +51,10 @@ pip install -e .
 hinoki new myblog
 cd myblog
 
-# 3. config/database.yml を編集 (ADB接続情報)
-vi config/database.yml
+# 3. database.yml を生成 (対話形式で接続情報を入力)
+hinoki db:init
+# 引数で直接指定することも可能:
+# hinoki db:init --dsn myadb_high --username ADMIN --password xxx --wallet /path/to/Wallet
 
 # 4. フレームワークを ADB にインストール
 hinoki install
@@ -102,6 +104,7 @@ pip install -e .
 | `oracledb` | Oracle Database 接続 (python-oracledb) |
 | `click` | CLI フレームワーク |
 | `pyyaml` | 設定ファイル読み込み |
+| `oci` (オプション) | OCI SDK — `db:download-wallet` で必要: `pip install "hinoki[oci]"` |
 
 ---
 
@@ -574,6 +577,22 @@ hinoki new <app_name>           # 新規プロジェクト作成
 hinoki install                   # ADBにフレームワークをインストール
 hinoki deploy                    # 全ファイルをADBにデプロイ
 
+# 接続設定
+hinoki db:init                   # config/database.yml を対話形式で生成
+hinoki db:init \                 # 引数で直接指定する場合
+  --dsn myadb_high \
+  --username ADMIN \
+  --password <pw> \
+  --wallet /path/to/Wallet
+hinoki db:init --force           # 既存の database.yml を上書き
+
+hinoki db:download-wallet        # OCI SDK でウォレットをダウンロード・展開 (要: pip install oci)
+hinoki db:download-wallet \      # 引数で直接指定する場合
+  --ocid ocid1.autonomousdatabase.oc1.xxx \
+  --wallet-password <pw> \
+  --dest ./wallet \
+  --update-config                # database.yml の wallet_location も自動更新
+
 # コード生成
 hinoki generate scaffold <name> <columns...>    # CRUD一式 (.hk)
 hinoki generate scaffold <name> <columns...> --sql  # CRUD一式 (.sql)
@@ -721,7 +740,37 @@ plsql = transpile_file(Path("app/models/article.model.hk"))
 
 ## ADB 接続設定
 
-### database.yml
+### database.yml の生成
+
+`hinoki db:init` コマンドで対話形式に生成できます:
+
+```bash
+$ hinoki db:init
+🌲 database.yml の設定を行います。
+
+  接続サービス名 (DSN / OCID 末尾の接続名, 例: myadb_high): myadb_high
+  DBユーザー名 [ADMIN]: ADMIN
+  DBパスワード: ********
+  DBパスワード (確認): ********
+  ウォレットフォルダのパス (例: /path/to/Wallet_xxx): /home/user/Wallet_myadb
+
+✓ config/database.yml を生成しました。
+✓ .gitignore に config/database.yml を追加しました。
+```
+
+引数で一括指定する場合 (CI/CD 環境など):
+
+```bash
+hinoki db:init \
+  --dsn myadb_high \
+  --username ADMIN \
+  --password "YourPassword!" \
+  --wallet /home/user/Wallet_myadb
+```
+
+既存ファイルを上書きする場合は `--force` を追加してください。
+
+生成される `config/database.yml` の形式:
 
 ```yaml
 environment: development
@@ -739,7 +788,36 @@ production:
   wallet_location: /path/to/Wallet_myatp
 ```
 
+> **セキュリティ**: `database.yml` にはパスワードが含まれます。`hinoki db:init` は自動的に `.gitignore` へ追加しますが、誤ってコミットしないよう注意してください。
+
 ### Wallet のダウンロード
+
+**方法1: CLI で自動ダウンロード（推奨）**
+
+OCI SDK をインストール済みであれば、コマンド一発でダウンロード〜展開〜設定反映まで完了します:
+
+```bash
+pip install "hinoki[oci]"   # または pip install oci
+hinoki db:download-wallet --update-config
+```
+
+初回は ADB の OCID・ウォレットパスワード・保存先を対話形式で入力します。  
+`--update-config` を指定すると `config/database.yml` の `wallet_location` も自動更新されます。
+
+引数で一括指定する場合:
+
+```bash
+hinoki db:download-wallet \
+  --ocid ocid1.autonomousdatabase.oc1.ap-tokyo-1.xxx \
+  --wallet-password "WalletPass!" \
+  --dest ./wallet \
+  --update-config
+```
+
+> **前提**: `~/.oci/config` に OCI の認証情報が設定されていること。  
+> 設定方法: https://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdkconfig.htm
+
+**方法2: OCI コンソールから手動ダウンロード**
 
 1. OCI Console → Autonomous Database → 対象DB → 「データベース接続」
 2. 「ウォレットのダウンロード」→ パスワード設定 → ZIP ダウンロード
