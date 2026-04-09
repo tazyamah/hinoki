@@ -44,3 +44,9 @@ include = ["hinoki*"]
 [tool.setuptools.package-data]
 "hinoki.core" = ["*.sql"]
 "hinoki.templates" = ["*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "requests>=2.32.5",
+]
